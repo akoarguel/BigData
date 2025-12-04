@@ -1,0 +1,17 @@
+usuarios = LOAD '/user/maria_dev/u.user' USING PigStorage('|') AS (id:int, age:int, gender:chararray, occupation:chararray, zip:chararray);
+grupos_genero = GROUP usuarios BY gender;
+total_genero = FOREACH grupos_genero GENERATE group AS genero, COUNT(usuarios) AS total;
+DUMP total_genero;
+grupos_ocupacion = GROUP usuarios BY occupation;
+conteo_ocupacion = FOREACH grupos_ocupacion GENERATE group AS ocupacion, COUNT(usuarios) AS cantidad;
+ordenado_ocupacion = ORDER conteo_ocupacion BY cantidad DESC;
+top_10_ocupaciones = LIMIT ordenado_ocupacion 10;
+DUMP top_10_ocupaciones;
+edad_media_genero = FOREACH grupos_genero GENERATE group AS genero, AVG(usuarios.age) AS edad_media;
+DUMP edad_media_genero;
+edad_media_ocupacion = FOREACH grupos_ocupacion GENERATE group AS ocupacion, AVG(usuarios.age) AS edad_media;
+DUMP edad_media_ocupacion;
+STORE total_genero INTO 'pig_usuarios/total_genero' USING PigStorage(',');
+STORE top_10_ocupaciones INTO 'pig_usuarios/top_ocupaciones' USING PigStorage(',');
+STORE edad_media_genero INTO 'pig_usuarios/edad_genero' USING PigStorage(',');
+STORE edad_media_ocupacion INTO 'pig_usuarios/edad_ocupacion' USING PigStorage(',');

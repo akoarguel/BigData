@@ -1,0 +1,55 @@
+cat > analisis_ventas_completo.pig <<'EOF'
+/* PR_03.1 - Apartado B: Análisis Completo Retail Sales
+   Script: analisis_ventas_completo.pig
+*/
+
+-- 1. Carga de datos
+ventas = LOAD '/user/maria_dev/retail_sales_dataset.csv' USING PigStorage(',') 
+    AS (trans_id:int, date:chararray, cust_id:chararray, gender:chararray, age:int, 
+        category:chararray, quantity:int, price:float, total_amount:float);
+
+-- 2. Filtrado > 30 años
+clientes_mayores = FILTER ventas BY age > 30;
+
+-- 3. Transformación (Mayúsculas y Descuento)
+ventas_transf = FOREACH ventas GENERATE 
+    UPPER(gender) AS gender_upper, 
+    (price * quantity * 0.90) AS precio_descuento;
+
+-- 4. Agregación por Categoría
+grupo_cat = GROUP ventas BY category;
+stats_cat = FOREACH grupo_cat GENERATE 
+    group AS categoria, 
+    COUNT(ventas) AS num_ventas, 
+    SUM(ventas.total_amount) AS total_ingresos, 
+    AVG(ventas.age) AS edad_media;
+
+-- 5. Categorías Distintas
+cat_unicas = DISTINCT (FOREACH ventas GENERATE category);
+
+-- 6. Top 5 Transacciones (Mayor importe)
+orden_total = ORDER ventas BY total_amount DESC;
+top5 = LIMIT orden_total 5;
+resultado_top5 = FOREACH top5 GENERATE trans_id, cust_id, category, total_amount;
+
+-- 7. Funciones de Cadena
+datos_cadena = FOREACH ventas GENERATE trans_id, SUBSTRING(category, 0, 3), SIZE(category);
+muestra_cadena = LIMIT datos_cadena 15;
+
+-- 8. Filtro Fecha y VIP
+ventas_vip = FILTER ventas BY (date < '2023-07-01') AND (total_amount > 500);
+grupo_vip = GROUP ventas_vip ALL;
+edad_vip = FOREACH grupo_vip GENERATE AVG(ventas_vip.age);
+
+-- ==========================================
+-- 9. ALMACENAMIENTO (STORE)
+-- Guardamos los resultados principales en carpetas HDFS
+-- ==========================================
+
+-- Borramos carpeta de salida usando -f para que no falle si no existe
+fs -rm -r -f ventas_analisis;
+
+STORE stats_cat INTO 'ventas_analisis/categorias_stats' USING PigStorage(',');
+STORE resultado_top5 INTO 'ventas_analisis/top5_ventas' USING PigStorage(',');
+STORE edad_vip INTO 'ventas_analisis/edad_promedio_vip' USING PigStorage(',');
+EOF
